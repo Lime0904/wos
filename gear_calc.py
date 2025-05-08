@@ -72,26 +72,63 @@ user_owned = {
 }
 
 st.markdown("---")
-st.subheader("Package Purchase Input")
-package_counts = {}
-package_cols = st.columns(5)
+st.subheader("Optional: Select Purchased Packages")
+
+# Define price tiers
 price_list = ["$5", "$10", "$20", "$50", "$100"]
-for i, price in enumerate(price_list):
-    with package_cols[i]:
-        count = st.number_input(f"{price}", min_value=0, value=0, step=1, key=f"pkg_{price}")
-        package_counts[price] = count
 
-# Calculate total resource from packages
+# Initialize package count dictionary
+package_counts = {}
 package_resources = {"Design": 0, "Alloy": 0, "Polish": 0, "Amber": 0, "Plans": 0, "DesignPlans": 0}
-for price, count in package_counts.items():
-    df = packages_df[packages_df["Package"] == price]
-    for _, row in df.iterrows():
-        res = row["Resource"]
-        if res not in package_resources:
-            package_resources[res] = 0
-        package_resources[res] += row["Amount"] * count
 
-# Merge package resource with user input
+# Artisans Packages
+st.markdown("### 📦 Artisans Packages")
+artisan_types = ["Sublime", "Exquisite", "Classic"]
+for artisan in artisan_types:
+    st.markdown(f"**{artisan}**")
+    cols = st.columns(len(price_list))
+    for i, price in enumerate(price_list):
+        key = f"{artisan}_{price}"
+        count = cols[i].number_input(label=price, min_value=0, value=0, step=1, key=key)
+        package_counts[key] = count
+    with st.expander(f"{artisan} Package Contents"):
+        pkg = packages_df[packages_df["Category"] == artisan]
+        for price in price_list:
+            sub = pkg[pkg["Package"] == price]
+            if not sub.empty:
+                st.markdown(f"**{price}**")
+                for _, row in sub.iterrows():
+                    st.markdown(f"- {row['Resource']}: {int(row['Amount'])}")
+
+# Dawn Market Packages
+st.markdown("### 🌙 Dawn Market")
+st.markdown("Design Plans Only")
+dawn_cols = st.columns(len(price_list))
+for i, price in enumerate(price_list):
+    key = f"DawnMarket_{price}"
+    count = dawn_cols[i].number_input(label=price, min_value=0, value=0, step=1, key=key)
+    package_counts[key] = count
+with st.expander("Dawn Market Package Contents"):
+    dawn = packages_df[packages_df["Category"] == "DawnMarket"]
+    for price in price_list:
+        sub = dawn[dawn["Package"] == price]
+        if not sub.empty:
+            st.markdown(f"**{price}**")
+            for _, row in sub.iterrows():
+                st.markdown(f"- {row['Resource']}: {int(row['Amount'])}")
+
+# Calculate resources from packages
+for key, count in package_counts.items():
+    if count > 0:
+        category, price = key.split("_")
+        pkg_rows = packages_df[(packages_df["Category"] == category) & (packages_df["Package"] == price)]
+        for _, row in pkg_rows.iterrows():
+            res = row["Resource"]
+            if res not in package_resources:
+                package_resources[res] = 0
+            package_resources[res] += row["Amount"] * count
+
+# Merge user input + package
 total_owned = {
     k: user_owned.get(k, 0) + package_resources.get(k, 0)
     for k in user_owned
